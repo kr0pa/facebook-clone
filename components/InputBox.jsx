@@ -4,7 +4,14 @@ import { VideoCameraIcon, CameraIcon } from "@heroicons/react/solid";
 import { EmojiHappyIcon } from "@heroicons/react/outline";
 import { useRef, useState } from "react";
 import { db, storage } from "../firebase";
-import { serverTimestamp } from "@firebase/firestore";
+import {
+  addDoc,
+  collection,
+  doc,
+  serverTimestamp,
+  updateDoc,
+} from "@firebase/firestore";
+import { getDownloadURL, ref, uploadString } from "@firebase/storage";
 
 function InputBox() {
   const { data: session } = useSession();
@@ -18,50 +25,69 @@ function InputBox() {
     return name[0];
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!inputRef.current.value) return;
 
-    db.collection("posts")
-      .add({
-        name: session?.user.name,
-        image: session?.user.image,
-        email: session?.user.email,
-        message: inputRef?.current.value,
-        timestamp: serverTimestamp(),
-      })
-      .then((doc) => {
-        if (image) {
-          const uploadTask = storage
-            .ref(`posts/${doc.id}`)
-            .putString(image, "data_url");
+    const docRef = await addDoc(collection(db, "posts"), {
+      name: session.user.username,
+      message: inputRef.current.value,
+      image: session.user.image,
+      timestamp: serverTimestamp(),
+    });
 
-          removeImage();
+    const imageRef = ref(storage, `posts/${docRef.id}/image`);
 
-          uploadTask.on(
-            "state_change",
-            null,
-            (err) => console.error(err),
-            () => {
-              storage
-                .ref("posts")
-                .child(doc.id)
-                .getDownloadURL()
-                .then((url) => {
-                  db.collection("posts").doc(doc.id).set(
-                    {
-                      postImage: url,
-                    },
-                    { merge: true }
-                  );
-                });
-            }
-          );
-        }
+    await uploadString(imageRef, image, "data_url").then(async (snap) => {
+      const downloadURL = await getDownloadURL(imageRef);
 
-        inputRef.current.value = "";
+      await updateDoc(doc(db, "posts", docRef.id), {
+        postImage: downloadURL,
       });
+
+      inputRef.current.value = "";
+    });
+
+    // db.collection("posts")
+    //   .add({
+    //     name: session?.user.name,
+    //     image: session?.user.image,
+    //     email: session?.user.email,
+    //     message: inputRef?.current.value,
+    //     timestamp: serverTimestamp(),
+    //   })
+    //   .then((doc) => {
+    //     if (image) {
+    //       const uploadTask = storage
+    //         .ref(`posts/${doc.id}`)
+    //         .putString(image, "data_url");
+
+    //       removeImage();
+
+    //       uploadTask.on(
+    //         "state_change",
+    //         null,
+    //         (err) => console.error(err),
+    //         () => {
+    //           storage
+    //             .ref("posts")
+    //             .child(doc.id)
+    //             .getDownloadURL()
+    //             .then((url) => {
+    //               db.collection("posts").doc(doc.id).set(
+    //                 {
+    //                   postImage: url,
+    //                 },
+    //                 { merge: true }
+    //               );
+    //             });
+    //         }
+    //       );
+    //     }
+
+    //     inputRef.current.value = "";
+    //   });
   };
 
   const addImage = (e) => {
@@ -85,7 +111,7 @@ function InputBox() {
       <div className="flex items-center">
         <Image
           className="rounded-full"
-          src={session?.user.image}
+          src={session?.user?.image}
           width={45}
           height={45}
         />

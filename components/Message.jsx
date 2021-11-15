@@ -1,51 +1,82 @@
 import Image from "next/image";
 import { PlusCircleIcon, ChatIcon } from "@heroicons/react/solid";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { db } from "../firebase";
 import { useSession } from "next-auth/react";
-import { useCollection } from "react-firebase-hooks/firestore";
 import MessageComment from "./MessageComment";
-import { serverTimestamp } from "@firebase/firestore";
+import {
+  addDoc,
+  collection,
+  onSnapshot,
+  orderBy,
+  query,
+  serverTimestamp,
+} from "@firebase/firestore";
 
 function Message({ id, postID, name, message, image, timestamp }) {
   const commentRef = useRef("");
   const { data: session } = useSession();
   const [visibleComment, setVisibleComment] = useState(false);
+  const [messageComments, setMessageComments] = useState([]);
 
-  const [messageComments] = useCollection(
-    db
-      .collection("posts")
-      .doc(postID)
-      .collection("messages")
-      .doc(id)
-      .collection("comment")
-      .orderBy("timestamp", "asc")
+  useEffect(
+    () =>
+      onSnapshot(
+        query(
+          collection(db, "posts", postID, "messages", id, "comment"),
+          orderBy("timestamp", "asc")
+        ),
+        (snap) => {
+          setMessageComments(snap.docs);
+        }
+      ),
+    [db, id, postID]
   );
+
+  // const [messageComments] = useCollection(
+  //   db
+  //     .collection("posts")
+  //     .doc(postID)
+  //     .collection("messages")
+  //     .doc(id)
+  //     .collection("comment")
+  //     .orderBy("timestamp", "asc")
+  // );
 
   const handleComment = () => {
     setVisibleComment(!visibleComment);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!commentRef.current.value) return;
 
-    db.collection("posts")
-      .doc(postID)
-      .collection("messages")
-      .doc(id)
-      .collection("comment")
-      .add({
-        name: session?.user.name,
-        image: session?.user.image,
-        email: session?.user.email,
-        message: commentRef?.current.value,
-        timestamp: serverTimestamp(),
-      })
-      .then(() => {
-        commentRef.current.value = "";
-      });
+    await addDoc(collection(db, "posts", postID, "messages", id, "comment"), {
+      name: session?.user.name,
+      image: session?.user.image,
+      email: session?.user.email,
+      message: commentRef?.current.value,
+      timestamp: serverTimestamp(),
+    }).then(() => {
+      commentRef.current.value = "";
+    });
+
+    // db.collection("posts")
+    //   .doc(postID)
+    //   .collection("messages")
+    //   .doc(id)
+    //   .collection("comment")
+    //   .add({
+    //     name: session?.user.name,
+    //     image: session?.user.image,
+    //     email: session?.user.email,
+    //     message: commentRef?.current.value,
+    //     timestamp: serverTimestamp(),
+    //   })
+    //   .then(() => {
+    //     commentRef.current.value = "";
+    //   });
   };
 
   return (
@@ -76,7 +107,7 @@ function Message({ id, postID, name, message, image, timestamp }) {
             </div>
 
             <div className="flex items-center text-yellow-600 cursor-default">
-              <p className="text-sm mr-1">{messageComments?.size}</p>
+              <p className="text-sm mr-1">{messageComments?.length}</p>
               <div>
                 <ChatIcon width={14} height={14} />
               </div>
@@ -88,7 +119,7 @@ function Message({ id, postID, name, message, image, timestamp }) {
           </div>
 
           {visibleComment &&
-            messageComments?.docs.map((messageComment) => {
+            messageComments?.map((messageComment) => {
               const { name, message, image, timestamp } = messageComment.data();
 
               return (

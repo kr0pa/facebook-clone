@@ -23,8 +23,6 @@ function Header() {
   const [mode, setMode] = useState(false);
   const router = useRouter();
 
-  console.log(session);
-
   useEffect(() => {
     const html = document.querySelector("html");
     const theme = JSON.parse(localStorage.getItem("theme"));
@@ -70,7 +68,7 @@ function Header() {
             className=" text-gray-600 dark:text-gray-300"
           />
           <input
-            className="bg-transparent outline-none  ml-2"
+            className="bg-transparent outline-none ml-2 dark:text-white"
             type="text"
             placeholder="Wyszukaj..."
           />

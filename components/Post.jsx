@@ -5,95 +5,153 @@ import {
   AnnotationIcon,
   ShareIcon,
 } from "@heroicons/react/outline";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import { db } from "../firebase";
-import { useCollection } from "react-firebase-hooks/firestore";
 import Message from "./Message";
 import { snackbarStatus } from "../slices/snackbarSlice";
 import { useDispatch } from "react-redux";
 import ToolShow from "./ToolShow";
-import { serverTimestamp } from "@firebase/firestore";
+import {
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  onSnapshot,
+  orderBy,
+  query,
+  serverTimestamp,
+  setDoc,
+  where,
+} from "@firebase/firestore";
 
 function Post({ id, image, message, postImage, timestamp, name }) {
   const { data: session } = useSession("");
   const commentRef = useRef("");
   const [statusComment, setStatusComment] = useState(false);
   const [statusLike, setStatusLike] = useState(false);
+
+  const [insertedLike, setInsertedLike] = useState(false);
+  const [insertedDislike, setInsertedDislike] = useState(false);
+  const [likes, setLikes] = useState([]);
+  const [dislikes, setDislikes] = useState([]);
+  const [messages, setMessages] = useState([]);
   const dispatch = useDispatch();
 
-  const [insertedLike] = useCollection(
-    db
-      .collection("posts")
-      .doc(id)
-      .collection("likes")
-      .where("name", "==", session?.user.name)
+  useEffect(
+    () =>
+      likes.findIndex((like) => {
+        if ((like.id === session?.user?.uid) !== -1) {
+          setInsertedLike(true);
+          setInsertedDislike(false);
+        }
+      }),
+    [likes]
   );
 
-  const [insertedDislike] = useCollection(
-    db
-      .collection("posts")
-      .doc(id)
-      .collection("dislikes")
-      .where("name", "==", session?.user.name)
+  useEffect(
+    () =>
+      dislikes.findIndex((dislike) => {
+        if ((dislike.id === session?.user?.uid) !== -1) {
+          setInsertedDislike(true);
+          setInsertedLike(false);
+        }
+      }),
+    [dislikes]
   );
 
-  const [messages] = useCollection(
-    db
-      .collection("posts")
-      .doc(id)
-      .collection("messages")
-      .orderBy("timestamp", "asc")
+  // useEffect(
+  //   () =>
+  //     onSnapshot(
+  //       query(
+  //         collection(db, "posts", id, "likes"),
+  //         where("name", "==", session?.user?.name)
+  //       ),
+  //       (snap) => {
+  //         setInsertedLike(snap.docs);
+  //       }
+  //     ),
+  //   [db, id]
+  // );
+
+  // useEffect(
+  //   () =>
+  //     onSnapshot(
+  //       query(
+  //         collection(db, "posts", id, "dislikes"),
+  //         where("name", "==", session?.user?.name)
+  //       ),
+  //       (snap) => {
+  //         setInsertedDislike(snap.docs);
+  //       }
+  //     ),
+  //   [db, id]
+  // );
+
+  useEffect(
+    () =>
+      onSnapshot(
+        query(
+          collection(db, "posts", id, "messages"),
+          orderBy("timestamp", "asc")
+        ),
+        (snap) => {
+          setMessages(snap.docs);
+        }
+      ),
+    [db, id]
   );
 
-  const [likes] = useCollection(
-    db
-      .collection("posts")
-      .doc(id)
-      .collection("likes")
-      .orderBy("timestamp", "desc")
+  useEffect(
+    () =>
+      onSnapshot(
+        query(
+          collection(db, "posts", id, "likes"),
+          orderBy("timestamp", "desc")
+        ),
+        (snap) => {
+          setLikes(snap.docs);
+        }
+      ),
+    [db, id]
   );
 
-  const [dislikes] = useCollection(
-    db
-      .collection("posts")
-      .doc(id)
-      .collection("dislikes")
-      .orderBy("timestamp", "desc")
+  useEffect(
+    () =>
+      onSnapshot(
+        query(
+          collection(db, "posts", id, "dislikes"),
+          orderBy("timestamp", "desc")
+        ),
+        (snap) => {
+          setDislikes(snap.docs);
+        }
+      ),
+    [db, id]
   );
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
-    db.collection("posts")
-      .doc(id)
-      .collection("messages")
-      .add({
-        name: session?.user.name,
-        message: commentRef?.current.value,
-        image: session?.user.image,
-        timestamp: serverTimestamp(),
-      })
-      .then(() => {
-        commentRef.current.value = "";
-      });
+    await addDoc(collection(db, "posts", id, "messages"), {
+      name: session?.user.name,
+      message: commentRef?.current.value,
+      image: session?.user.image,
+      timestamp: serverTimestamp(),
+    }).then(() => {
+      commentRef.current.value = "";
+    });
   };
 
-  const addLike = () => {
-    if (!insertedLike?.size) {
-      db.collection("posts")
-        .doc(id)
-        .collection("likes")
-        .add({
-          name: session?.user.name,
-          timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-        })
+  const addLike = async () => {
+    if (!insertedLike) {
+      await setDoc(doc(db, "posts", id, "likes", session.user.uid), {
+        username: session.user.username,
+        name: session.user.name,
+        timestamp: serverTimestamp(),
+      })
         .then(() => {
-          db.collection("posts")
-            .doc(id)
-            .collection("dislikes")
-            .doc(insertedDislike?.docs[0]?.id)
-            .delete();
+          deleteDoc(doc(db, "posts", id, "dislikes", session.user.uid));
         })
         .then(() => {
           dispatch(
@@ -106,21 +164,15 @@ function Post({ id, image, message, postImage, timestamp, name }) {
     }
   };
 
-  const addDislike = () => {
-    if (!insertedDislike?.size) {
-      db.collection("posts")
-        .doc(id)
-        .collection("dislikes")
-        .add({
-          name: session?.user.name,
-          timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-        })
+  const addDislike = async () => {
+    if (!insertedDislike) {
+      await setDoc(doc(db, "posts", id, "dislikes", session.user.uid), {
+        username: session.user.username,
+        name: session.user.name,
+        timestamp: serverTimestamp(),
+      })
         .then(() => {
-          db.collection("posts")
-            .doc(id)
-            .collection("likes")
-            .doc(insertedLike?.docs[0]?.id)
-            .delete();
+          deleteDoc(doc(db, "posts", id, "likes", session.user.uid));
         })
         .then(() => {
           dispatch(
@@ -161,9 +213,9 @@ function Post({ id, image, message, postImage, timestamp, name }) {
       <div className="flex justify-end items-center p-2 text-red-500 cursor-default border-b dark:border-[#4E4F50]">
         {statusLike ? (
           <>
-            {likes?.size ? (
+            {likes?.length ? (
               <ToolShow
-                content={likes?.docs.map((like) => (
+                content={likes?.map((like) => (
                   <p key={like.id}>{like.data().name}</p>
                 ))}
               >
@@ -173,7 +225,7 @@ function Post({ id, image, message, postImage, timestamp, name }) {
                 >
                   <ThumbUpIcon width={18} height={18} />
                   <p className="text-md text-black dark:text-white ml-1">
-                    {likes?.size}
+                    {likes?.length}
                   </p>
                 </div>
               </ToolShow>
@@ -184,14 +236,14 @@ function Post({ id, image, message, postImage, timestamp, name }) {
               >
                 <ThumbUpIcon width={18} height={18} />
                 <p className="text-md text-black dark:text-white ml-1">
-                  {likes?.size}
+                  {likes?.length}
                 </p>
               </div>
             )}
 
-            {dislikes?.size ? (
+            {dislikes?.length ? (
               <ToolShow
-                content={dislikes?.docs.map((dislike) => (
+                content={dislikes?.map((dislike) => (
                   <p key={dislike.id}>{dislike.data().name}</p>
                 ))}
               >
@@ -201,7 +253,7 @@ function Post({ id, image, message, postImage, timestamp, name }) {
                 >
                   <ThumbDownIcon width={18} height={18} />
                   <p className="text-md text-black dark:text-white ml-1">
-                    {dislikes?.size}
+                    {dislikes?.length}
                   </p>
                 </div>
               </ToolShow>
@@ -212,7 +264,7 @@ function Post({ id, image, message, postImage, timestamp, name }) {
               >
                 <ThumbDownIcon width={18} height={18} />
                 <p className="text-md text-black dark:text-white ml-1">
-                  {dislikes?.size}
+                  {dislikes?.length}
                 </p>
               </div>
             )}
@@ -234,7 +286,7 @@ function Post({ id, image, message, postImage, timestamp, name }) {
       {statusComment && (
         <div className="flex flex-col p-3">
           {messages &&
-            messages?.docs.map((doc) => {
+            messages?.map((doc) => {
               const { name, message, image, timestamp } = doc.data();
 
               return (

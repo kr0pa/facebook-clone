@@ -27,18 +27,18 @@ export default function Home() {
         <>
           <Header />
 
-          <main className="flex justify-center ">
+          <main className="flex flex-grow min-h-screen justify-center ">
             <Sidebar />
-            {/* <Feed /> */}
+            <Feed />
           </main>
 
-          {/* <Toast
-  open={selectData?.open}
-  message={selectData?.message}
-  time={selectData?.time}
-/>
+          <Toast
+            open={selectData?.open}
+            message={selectData?.message}
+            time={selectData?.time}
+          />
 
-<ToolShow /> */}
+          <ToolShow />
         </>
       ) : (
         <Login />
