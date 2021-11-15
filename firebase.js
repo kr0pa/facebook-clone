@@ -3,12 +3,12 @@ import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCLzCkzzVz-iouXT1kGXF0-0avRRz2COtU",
-  authDomain: "facebook-clone-6cefc.firebaseapp.com",
-  projectId: "facebook-clone-6cefc",
-  storageBucket: "facebook-clone-6cefc.appspot.com",
-  messagingSenderId: "360819561149",
-  appId: "1:360819561149:web:fa438daecef4ac83df1dd4",
+  apiKey: "AIzaSyBA-WPYLo2WkB6qmJNZ1MCaa7RR6hxKlEQ",
+  authDomain: "facebook-clone-8bd5b.firebaseapp.com",
+  projectId: "facebook-clone-8bd5b",
+  storageBucket: "facebook-clone-8bd5b.appspot.com",
+  messagingSenderId: "559991692094",
+  appId: "1:559991692094:web:9e9e1faa598f932a8caa6f",
 };
 
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
